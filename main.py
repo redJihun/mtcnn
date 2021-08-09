@@ -58,6 +58,7 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     origin_h, origin_w, ch = caffe_img.shape
     scales = tools.calculateScales(img)
     out = []
+    #
     t0 = time.time()
     # del scales[:4]
 
