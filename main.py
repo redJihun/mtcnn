@@ -83,7 +83,7 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     rectangles = tools.NMS(rectangles, 0.7, 'iou')
 
     t1 = time.time()
-    print('time for 12 net is: ', t1-t0)
+    # print('time for 12 net is: ', t1-t0)
 
     if len(rectangles) == 0:
         return rectangles
@@ -101,15 +101,16 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
 
     out = Rnet.predict(predict_24_batch)
 
+    # print(out)
     cls_prob = out[0]  # first 0 is to select cls, second batch number, always =0
     cls_prob = np.array(cls_prob)  # convert to numpy
     roi_prob = out[1]  # first 0 is to select roi, second batch number, always =0
     roi_prob = np.array(roi_prob)
     rectangles = tools.filter_face_24net(cls_prob, roi_prob, rectangles, origin_w, origin_h, threshold[1])
     t2 = time.time()
-    print('time for 24 net is: ', t2-t1)
+    # print('time for 24 net is: ', t2-t1)
 
-
+    print(rectangles)
     # if len(rectangles) == 0:
     return rectangles
 
@@ -138,41 +139,42 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     # return rectangles
 
 def train():
-    threshold = [0.4, 0.4, 0.5]
+    threshold = [0.5, 0.5, 0.7]
     # video_path = 'WalmartArguments_p1.mkv'
     # cap = cv2.VideoCapture(video_path)
 
-    while (True):
-        # ret, img = cap.read()
-        img = cv2.imread('000001.png')
+    # while (True):
+    # ret, img = cap.read()
+    img = cv2.imread('000001.jpg')
 
-        rectangles = detectFace(img, threshold)
-        draw = img.copy()
+    rectangles = detectFace(img, threshold)
+    draw = img.copy()
 
-        for rectangle in rectangles:
-            if rectangle is not None:
-                W = -int(rectangle[0]) + int(rectangle[2])
-                H = -int(rectangle[1]) + int(rectangle[3])
-                paddingH = 0.01 * W
-                paddingW = 0.02 * H
-                crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
-                           int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
-                crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
-                if crop_img is None:
-                    continue
-                if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
-                    continue
-                cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
-                              (255, 0, 0), 1)
+    for rectangle in rectangles:
+        if rectangle is not None:
+            W = -int(rectangle[0]) + int(rectangle[2])
+            H = -int(rectangle[1]) + int(rectangle[3])
+            paddingH = 0.01 * W
+            paddingW = 0.02 * H
+            crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
+                       int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
+            crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
+            if crop_img is None:
+                continue
+            if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
+                continue
+            cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
+                          (255, 0, 0), 1)
 
-                # for i in range(5, 15, 2):
-                #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
-        cv2.imshow("test", draw)
-        c = cv2.waitKey(1) & 0xFF
-        if c == 27 or c == ord('q'):
-            break
+            # for i in range(5, 15, 2):
+            #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
+    cv2.imshow("test", draw)
+    c = cv2.waitKey(0) & 0xFF
+    if c == 27 or c == ord('q'):
+        # break
+        return
 
-        # cv2.imwrite('test.jpg', draw)
+    # cv2.imwrite('test.jpg', draw)
 
 
 if __name__ == "__main__":
