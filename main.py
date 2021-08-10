@@ -151,8 +151,14 @@ def train():
         if not line: break
         bbox_labels.append(line.split())
 
-    print(np.shape(bbox_labels))
-    print(bbox_labels[0])
+    # print(np.shape(bbox_labels))
+    # print(bbox_labels[0])
+
+    img_dir = './img_celeba'
+    img_paths = os.walk(img_dir).__next__()[2]
+    imgs = []
+    for path in img_paths:
+        imgs.append(os.path.join(img_dir, path))
 
     threshold = [0.5, 0.5, 0.7]
     # video_path = 'WalmartArguments_p1.mkv'
@@ -160,37 +166,40 @@ def train():
 
     # while (True):
     # ret, img = cap.read()
-    img = cv2.imread('000001.jpg')
 
-    rectangles = detectFace(img, threshold)
-    draw = img.copy()
+    for img_path, bbox_label in zip(imgs, bbox_labels):
+        img = cv2.imread(img_path)
 
-    for rectangle in rectangles:
-        if rectangle is not None:
-            W = -int(rectangle[0]) + int(rectangle[2])
-            H = -int(rectangle[1]) + int(rectangle[3])
-            paddingH = 0.01 * W
-            paddingW = 0.02 * H
-            crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
-                       int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
-            crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
-            if crop_img is None:
-                continue
-            if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
-                continue
-            cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
-                          (255, 0, 0), 1)
+        rectangles = detectFace(img, threshold)
+        draw = img.copy()
 
-            # for i in range(5, 15, 2):
-            #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
-    cv2.imshow("test", draw)
-    c = cv2.waitKey(0) & 0xFF
-    if c == 27 or c == ord('q'):
-        # break
-        return
+        for rectangle in rectangles:
+            if rectangle is not None:
+                W = -int(rectangle[0]) + int(rectangle[2])
+                H = -int(rectangle[1]) + int(rectangle[3])
+                paddingH = 0.01 * W
+                paddingW = 0.02 * H
+                crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
+                           int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
+                crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
+                if crop_img is None:
+                    continue
+                if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
+                    continue
+                cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
+                              (255, 0, 0), 1)
 
-    # cv2.imwrite('test.jpg', draw)
+                # for i in range(5, 15, 2):
+                #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
+        cv2.imshow("test", draw)
+        c = cv2.waitKey(0) & 0xFF
+        if c == 27 or c == ord('q'):
+            # break
+            return
+
+        # cv2.imwrite('test.jpg', draw)
 
 
 if __name__ == "__main__":
     train()
+
