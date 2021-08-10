@@ -1,3 +1,5 @@
+import os
+
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, Input, MaxPool2D, Flatten, Dense, Permute, PReLU
 from tensorflow.keras.models import Model
@@ -139,6 +141,19 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     # return rectangles
 
 def train():
+    bbox_labels = []
+    label_file = open("list_bbox_celeba.txt", "r")          # celebA 데이터셋에서 제공되는 Bbox 라벨
+    label_file.readline()           # 첫번째 줄은 전체 데이터 개수가 써 있음
+    label_file.readline()           # 두번째 줄은 헤더가 써 있음
+
+    while True:
+        line = label_file.readline()
+        if not line: break
+        bbox_labels.append(line.split())
+
+    print(np.shape(bbox_labels))
+    print(bbox_labels[0])
+
     threshold = [0.5, 0.5, 0.7]
     # video_path = 'WalmartArguments_p1.mkv'
     # cap = cv2.VideoCapture(video_path)
