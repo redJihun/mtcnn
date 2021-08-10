@@ -1,7 +1,6 @@
 import tensorflow as tf
-from keras.layers import Conv2D, Input, MaxPool2D, Flatten, Dense, Permute
-from keras.models import Model
-from keras.layers.advanced_activations import PReLU
+from tensorflow.keras.layers import Conv2D, Input, MaxPool2D, Flatten, Dense, Permute, PReLU
+from tensorflow.keras.models import Model
 
 import numpy as np
 
@@ -111,29 +110,70 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     print('time for 24 net is: ', t2-t1)
 
 
-    if len(rectangles) == 0:
-        return rectangles
-
-
-    crop_number = 0
-    predict_batch = []
-    for rectangle in rectangles:
-        # print('calculating net 48 crop_number:', crop_number)
-        crop_img = caffe_img[int(rectangle[1]):int(rectangle[3]), int(rectangle[0]):int(rectangle[2])]
-        scale_img = cv2.resize(crop_img, (48, 48))
-        predict_batch.append(scale_img)
-        crop_number += 1
-
-    predict_batch = np.array(predict_batch)
-
-    output = Onet.predict(predict_batch)
-    cls_prob = output[0]
-    roi_prob = output[1]
-    pts_prob = output[2]  # index
-    # rectangles = tools.filter_face_48net_newdef(cls_prob, roi_prob, pts_prob, rectangles, origin_w, origin_h,
-    #                                             threshold[2])
-    rectangles = tools.filter_face_48net(cls_prob, roi_prob, pts_prob, rectangles, origin_w, origin_h, threshold[2])
-    t3 = time.time()
-    print ('time for 48 net is: ', t3-t2)
-
+    # if len(rectangles) == 0:
     return rectangles
+
+
+    # crop_number = 0
+    # predict_batch = []
+    # for rectangle in rectangles:
+    #     # print('calculating net 48 crop_number:', crop_number)
+    #     crop_img = caffe_img[int(rectangle[1]):int(rectangle[3]), int(rectangle[0]):int(rectangle[2])]
+    #     scale_img = cv2.resize(crop_img, (48, 48))
+    #     predict_batch.append(scale_img)
+    #     crop_number += 1
+    #
+    # predict_batch = np.array(predict_batch)
+    #
+    # output = Onet.predict(predict_batch)
+    # cls_prob = output[0]
+    # roi_prob = output[1]
+    # pts_prob = output[2]  # index
+    # # rectangles = tools.filter_face_48net_newdef(cls_prob, roi_prob, pts_prob, rectangles, origin_w, origin_h,
+    # #                                             threshold[2])
+    # rectangles = tools.filter_face_48net(cls_prob, roi_prob, pts_prob, rectangles, origin_w, origin_h, threshold[2])
+    # t3 = time.time()
+    # print ('time for 48 net is: ', t3-t2)
+    #
+    # return rectangles
+
+def train():
+    threshold = [0.4, 0.4, 0.5]
+    # video_path = 'WalmartArguments_p1.mkv'
+    # cap = cv2.VideoCapture(video_path)
+
+    while (True):
+        # ret, img = cap.read()
+        img = cv2.imread('000001.png')
+
+        rectangles = detectFace(img, threshold)
+        draw = img.copy()
+
+        for rectangle in rectangles:
+            if rectangle is not None:
+                W = -int(rectangle[0]) + int(rectangle[2])
+                H = -int(rectangle[1]) + int(rectangle[3])
+                paddingH = 0.01 * W
+                paddingW = 0.02 * H
+                crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
+                           int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
+                crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
+                if crop_img is None:
+                    continue
+                if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
+                    continue
+                cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
+                              (255, 0, 0), 1)
+
+                # for i in range(5, 15, 2):
+                #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
+        cv2.imshow("test", draw)
+        c = cv2.waitKey(1) & 0xFF
+        if c == 27 or c == ord('q'):
+            break
+
+        # cv2.imwrite('test.jpg', draw)
+
+
+if __name__ == "__main__":
+    train()
