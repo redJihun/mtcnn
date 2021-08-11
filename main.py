@@ -58,6 +58,7 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     caffe_img = (img.copy() - 127.5) / 127.5
     origin_h, origin_w, ch = caffe_img.shape
     scales = tools.calculateScales(img)
+    # scales = [1, 0.5]
     out = []
     #
     t0 = time.time()
@@ -70,8 +71,10 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
         input = scale_img.reshape(1, *scale_img.shape)
         ouput = Pnet.predict(input)  # .transpose(0,2,1,3) should add, but seems after process is wrong then.
         out.append(ouput)
+
     image_num = len(scales)
     rectangles = []
+
     for i in range(image_num):
         cls_prob = out[i][0][0][:, :, 1]  # i = #scale, first 0 select cls score, second 0 = batchnum, alway=0. 1 one hot repr
         roi = out[i][1][0]
@@ -157,26 +160,59 @@ def calculate_iou(rectangles, bbox_label):
     return ious
 
 
-def train():
-    bbox_labels = []
-    label_file = open("list_bbox_celeba.txt", "r")          # celebA 데이터셋에서 제공되는 Bbox 라벨
-    label_file.readline()           # 첫번째 줄은 전체 데이터 개수가 써 있음
-    label_file.readline()           # 두번째 줄은 헤더가 써 있음
+def train(dataset):
+    # celebA ===========================================================================================================
+    if(dataset=='c' or dataset=='C'):
+        bbox_labels = []
+        label_file = open("list_bbox_celeba.txt", "r")          # celebA 데이터셋에서 제공되는 Bbox 라벨
+        label_file.readline()           # 첫번째 줄은 전체 데이터 개수가 써 있음
+        label_file.readline()           # 두번째 줄은 헤더가 써 있음
 
-    while True:
-        line = label_file.readline()
-        if not line: break
-        bbox_labels.append(line.split())
+        while True:
+            line = label_file.readline()
+            if not line: break
+            bbox_labels.append(line.split())
 
-    # print(np.shape(bbox_labels))
-    # print(bbox_labels[0])
+        # print(np.shape(bbox_labels))
+        # print(bbox_labels[0])
 
-    img_dir = './img_celeba'
-    img_paths = os.walk(img_dir).__next__()[2]
-    imgs = []
-    for path in img_paths:
-        imgs.append(os.path.join(img_dir, path))
-    imgs.sort()
+        img_dir = './img_celeba'
+        img_paths = os.walk(img_dir).__next__()[2]
+        imgs = []
+        for path in img_paths:
+            imgs.append(os.path.join(img_dir, path))
+        imgs.sort()
+    # ==================================================================================================================
+
+    # Wider ============================================================================================================
+    if dataset=='w' or dataset=='W':
+        bbox_labels = []
+        label_file = open('./wider_face_split/wider_face_train_bbx_gt.txt', 'r')
+        while True:
+            name = label_file.readline()
+            if not name: break
+            num = int(label_file.readline().split()[0])
+            print(num)
+            labels = []
+            if num <= 0:
+                label = [int(x) for x in label_file.readline().split()]
+                labels.append(label)
+                pass
+            else:
+                for i in range(num):
+                    label = [int(x) for x in label_file.readline().split()]
+                    labels.append(label)
+            bbox_labels.append(labels)
+
+        root_dir = './WIDER_train/images'
+        classes = os.walk(root_dir).__next__()[1]
+
+        img_paths = os.walk(img_dir).__next__()[2]
+        imgs = []
+        for path in img_paths:
+            imgs.append(os.path.join(img_dir, path))
+        imgs.sort()
+    # ==================================================================================================================
 
     threshold = [0.6, 0.6, 0.7]
     # video_path = 'WalmartArguments
@@ -187,6 +223,7 @@ def train():
     # ret, img = cap.read()
     iou_list = []
     accuracy = []
+    tp_list = []
     count = 1
     for img_path, bbox_label in zip(imgs, bbox_labels):
         print(count)
@@ -194,12 +231,14 @@ def train():
         img = cv2.imread(img_path)
 
         rectangles = detectFace(img, threshold)
+        print(rectangles)
 
         ious = calculate_iou(rectangles, bbox_label)
         for iou in ious:
             iou_list.append(iou)
             if iou > 0.5:
                 accuracy.append(1)
+                tp_list.append(iou)
             else:
                 accuracy.append(0)
 
@@ -231,6 +270,7 @@ def train():
         # print(iou_list)
         print("mean of IoU = {}".format(np.mean(iou_list)))
         print("accuracy = {}".format(np.mean(accuracy)))
+        print("mean of TP IoU = {}".format(np.mean(tp_list)))
         # cv2.imshow("test", draw)
         # c = cv2.waitKey(0) & 0xFF
         # if c == 27 or c == ord('q'):
@@ -243,5 +283,6 @@ def train():
 
 
 if __name__ == "__main__":
-    train()
+    ds = input("사용할 데이터셋을 선택(c:celebA, w:wider) >> ")
+    train(ds)
 
