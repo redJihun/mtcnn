@@ -112,7 +112,6 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     t2 = time.time()
     # print('time for 24 net is: ', t2-t1)
 
-    print(rectangles)
     # if len(rectangles) == 0:
     return rectangles
 
@@ -140,6 +139,24 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     #
     # return rectangles
 
+
+def calculate_iou(rectangles, bbox_label):
+    ious = []
+
+    for rectangle in rectangles:
+        if (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) < 0 or \
+                (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2]))) < 0:
+            continue
+
+        numerator = (min(rectangle[2], int(bbox_label[1])+int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) * \
+                    (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2])))
+        denominator = (int(bbox_label[3]) * int(bbox_label[4])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
+        iou = numerator / denominator
+        ious.append(iou)
+
+    return ious
+
+
 def train():
     bbox_labels = []
     label_file = open("list_bbox_celeba.txt", "r")          # celebA 데이터셋에서 제공되는 Bbox 라벨
@@ -159,18 +176,33 @@ def train():
     imgs = []
     for path in img_paths:
         imgs.append(os.path.join(img_dir, path))
+    imgs.sort()
 
-    threshold = [0.5, 0.5, 0.7]
-    # video_path = 'WalmartArguments_p1.mkv'
+    threshold = [0.6, 0.6, 0.7]
+    # video_path = 'WalmartArguments
+    # _p1.mkv'
     # cap = cv2.VideoCapture(video_path)
 
     # while (True):
     # ret, img = cap.read()
-
+    iou_list = []
+    accuracy = []
+    count = 1
     for img_path, bbox_label in zip(imgs, bbox_labels):
+        print(count)
+        count += 1
         img = cv2.imread(img_path)
 
         rectangles = detectFace(img, threshold)
+
+        ious = calculate_iou(rectangles, bbox_label)
+        for iou in ious:
+            iou_list.append(iou)
+            if iou > 0.5:
+                accuracy.append(1)
+            else:
+                accuracy.append(0)
+
         draw = img.copy()
 
         for rectangle in rectangles:
@@ -181,23 +213,33 @@ def train():
                 paddingW = 0.02 * H
                 crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
                            int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
-                crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
-                if crop_img is None:
+                try:
+                    crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
+                    if crop_img is None:
+                        continue
+                    if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
+                        continue
+                    cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
+                                  (255, 0, 0), 1)
+                except:
                     continue
-                if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
-                    continue
-                cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
-                              (255, 0, 0), 1)
 
                 # for i in range(5, 15, 2):
                 #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
-        cv2.imshow("test", draw)
-        c = cv2.waitKey(0) & 0xFF
-        if c == 27 or c == ord('q'):
-            # break
-            return
+        # print(bbox_label)
+        # print(rectangles)
+        # print(iou_list)
+        print("mean of IoU = {}".format(np.mean(iou_list)))
+        print("accuracy = {}".format(np.mean(accuracy)))
+        # cv2.imshow("test", draw)
+        # c = cv2.waitKey(0) & 0xFF
+        # if c == 27 or c == ord('q'):
+        #     # break
+        #     # return
+        #     pass
 
         # cv2.imwrite('test.jpg', draw)
+    print(np.mean(iou_list))
 
 
 if __name__ == "__main__":
