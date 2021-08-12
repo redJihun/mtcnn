@@ -1,5 +1,6 @@
 import os
 
+import numpy
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, Input, MaxPool2D, Flatten, Dense, Permute, PReLU
 from tensorflow.keras.models import Model
@@ -106,7 +107,6 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
 
     out = Rnet.predict(predict_24_batch)
 
-    # print(out)
     cls_prob = out[0]  # first 0 is to select cls, second batch number, always =0
     cls_prob = np.array(cls_prob)  # convert to numpy
     roi_prob = out[1]  # first 0 is to select roi, second batch number, always =0
@@ -143,13 +143,15 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     # return rectangles
 
 
-def calculate_iou(rectangles, bbox_label, ds='c'):
+def calculate_iou(rects, bbox_label, ds):
     confidences = []
     ious = []
     true_positives = []
     false_positives = []
-    total_objects = 0
-
+    total_objects = len(bbox_label)
+    rectangles = rects.copy()
+    print("total_objects : {}".format(total_objects))
+    print("input rectangles: {}".format(len(rectangles)))
     if ds == 'c':
         for rectangle in rectangles:
             # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
@@ -165,39 +167,57 @@ def calculate_iou(rectangles, bbox_label, ds='c'):
             ious.append(iou)
     else:
         for lbl in bbox_label:
-            for rectangle in rectangles:
-                # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
-                if (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) < 0 or \
-                        (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1]))) < 0:
-                    continue
+            # print("lbl: {}".format(lbl))
+            try:
+                for rectangle in rectangles:
+                    # print("single rectangle: {}".format(rectangle))
+                    # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
+                    if (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) < 0 or \
+                            (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1]))) < 0:
+                        continue
 
-                # 분자 계산 = 라벨과 예측 bbox의 교집합 넓이
-                numerator = (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) * \
-                            (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1])))
-                # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
-                denominator = (int(lbl[2]) * int(lbl[3])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
-                # IoU = 교집합넓이 / 합집합넓이
-                iou = numerator / denominator
+                    else:
+                        # 분자 계산 = 라벨과 예측 bbox의 교집합 넓이
+                        numerator = (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) * \
+                                    (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1])))
+                        # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
+                        denominator = (int(lbl[2]) * int(lbl[3])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
+                        # IoU = 교집합넓이 / 합집합넓이
+                        iou = numerator / denominator
+                        # print("iou: {}".format(iou))
 
-                # IoU 가 0.5 이상이면 올바르게 예측했다고 판단
-                # PR 계산을 위해 Confidence, IoU, TP여부, FP여부 저장 및 해당 bbox 제거(중복 집계 방지)
-                if iou >= 0.5:
-                    confidences.append(rectangle[4])
-                    ious.append(iou)
-                    true_positives.append(1)
-                    false_positives.append(0)
-                    rectangles = rectangles.remove(rectangle)
-                    break
-            # Recall 계산을 위해 전체 bbox 개수 카운트
-            total_objects += 1
+                    # IoU 가 0.5 이상이면 올바르게 예측했다고 판단
+                    # PR 계산을 위해 Confidence, IoU, TP여부, FP여부 저장 및 해당 bbox 제거(중복 집계 방지)
+                    if iou >= 0.5:
+                        confidences.append(rectangle[4])
+                        ious.append(iou)
+                        true_positives.append(1)
+                        false_positives.append(0)
+                        rectangles.remove(rectangle)
+                        break
+            except:
+                continue
+
         # FP 케이스는 위 조건문에서 집계되지 않으므로 따로 추가해줌, FP 케이스인지는 모든 라벨을 검토한 후에 확인 가능하기 때문
-        for rectangle in rectangles:
-            confidences.append(rectangle[4])
-            ious.append(0)
-            true_positives.append(0)
-            false_positives.append(1)
+        try:
+            for rectangle in rectangles:
+                confidences.append(rectangle[4])
+                ious.append(0)
+                true_positives.append(0)
+                false_positives.append(1)
+        except:
+            pass
+    # confidences = np.reshape((None, 1), confidences)
+    result_list = []
+    result_list.append(confidences)
+    result_list.append(ious)
+    result_list.append(true_positives)
+    result_list.append(false_positives)
+    result_list = np.transpose(result_list)
+    print("result_list : {}".format(result_list))
+    # result_list = np.concatenate((np.reshape((-1, 1), confidences), np.reshape((-1, 1), ious), np.reshape((-1, 1), true_positives), np.reshape((-1, 1), false_positives)), axis=1)
 
-    return ious
+    return result_list
 
 
 def train(dataset):
@@ -213,26 +233,23 @@ def train(dataset):
             if not line: break
             bbox_labels.append(line.split())
 
-        # print(np.shape(bbox_labels))
-        # print(bbox_labels[0])
-
-        img_dir = './img_celeba'
-        img_paths = os.walk(img_dir).__next__()[2]
-        imgs = []
-        for path in img_paths:
-            imgs.append(os.path.join(img_dir, path))
-        imgs.sort()
+        root_dir = './img_celeba'
+        file_names = os.walk(root_dir).__next__()[2]
+        # file_names = []
+        # for path in img_paths:
+        #     file_names.append(os.path.join(root_dir, path))
+        file_names.sort()
     # ==================================================================================================================
 
     # Wider ============================================================================================================
     if dataset=='w' or dataset=='W':
         bbox_labels = []
         label_file = open('./wider_face_split/wider_face_train_bbx_gt.txt', 'r')
+        file_names = []
         while True:
             name = label_file.readline()
             if not name: break
             num = int(label_file.readline().split()[0])
-            print(num)
             labels = []
             if num <= 0:
                 label = [int(x) for x in label_file.readline().split()]
@@ -242,17 +259,14 @@ def train(dataset):
                 for i in range(num):
                     label = [int(x) for x in label_file.readline().split()]
                     labels.append(label)
+
+            file_names.append(name.replace("\n", ""))
             bbox_labels.append(labels)
 
         root_dir = './WIDER_train/images'
-        classes = os.walk(root_dir).__next__()[1]
-        imgs = []
-        for c in classes:
-            c_dir = os.path.join(root_dir, c)
-            img_paths = os.walk(c_dir).__next__()[2]
-            for path in img_paths:
-                imgs.append(os.path.join(c_dir, path))
-        imgs.sort()
+        # imgs = []
+        # for path in file_names:
+        #     imgs.append(os.path.join(root_dir, path))
     # ==================================================================================================================
 
     threshold = [0.6, 0.6, 0.7]
@@ -262,68 +276,65 @@ def train(dataset):
 
     # while (True):
     # ret, img = cap.read()
-    iou_list = []
-    accuracy = []
-    tp_list = []
+    results = []
     count = 1
-    for img_path, bbox_label in zip(imgs, bbox_labels):
-        print(count)
+    for img_path, bbox_label in zip(file_names, bbox_labels):
+        print("image count: {}".format(count))
         count += 1
-        img = cv2.imread(img_path)
+        img = cv2.imread(os.path.join(root_dir, img_path))
 
         rectangles = detectFace(img, threshold)
-        print(rectangles)
 
-        ious = calculate_iou(rectangles, bbox_label, dataset)
-        for iou in ious:
-            iou_list.append(iou)
-            if iou > 0.5:
-                accuracy.append(1)
-                tp_list.append(iou)
-            else:
-                accuracy.append(0)
+        result = calculate_iou(rectangles, bbox_label, dataset)
+        results.append(result)
+        # for iou in ious:
+        #     iou_list.append(iou)
+        #     if iou > 0.5:
+        #         accuracy.append(1)
+        #         tp_list.append(iou)
+        #     else:
+        #         accuracy.append(0)
 
-        draw = img.copy()
-
-        for rectangle in rectangles:
-            if rectangle is not None:
-                W = -int(rectangle[0]) + int(rectangle[2])
-                H = -int(rectangle[1]) + int(rectangle[3])
-                paddingH = 0.01 * W
-                paddingW = 0.02 * H
-                crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
-                           int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
-                try:
-                    crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
-                    if crop_img is None:
-                        continue
-                    if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
-                        continue
-                    cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
-                                  (255, 0, 0), 1)
-                except:
-                    continue
-
-                # for i in range(5, 15, 2):
-                #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
-        # print(bbox_label)
-        # print(rectangles)
-        # print(iou_list)
-        print("mean of IoU = {}".format(np.mean(iou_list)))
-        print("accuracy = {}".format(np.mean(accuracy)))
-        print("mean of TP IoU = {}".format(np.mean(tp_list)))
+        # draw = img.copy()
+        #
+        # for rectangle in rectangles:
+        #     if rectangle is not None:
+        #         W = -int(rectangle[0]) + int(rectangle[2])
+        #         H = -int(rectangle[1]) + int(rectangle[3])
+        #         paddingH = 0.01 * W
+        #         paddingW = 0.02 * H
+        #         crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
+        #                    int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
+        #         try:
+        #             crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
+        #             if crop_img is None:
+        #                 continue
+        #             if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
+        #                 continue
+        #             cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
+        #                           (255, 0, 0), 1)
+        #         except:
+        #             continue
+        #
+        #         # for i in range(5, 15, 2):
+        #         #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
+        # # print("mean of IoU = {}".format(np.mean(iou_list)))
+        # # print("accuracy = {}".format(np.mean(accuracy)))
+        # # print("mean of TP IoU = {}".format(np.mean(tp_list)))
         # cv2.imshow("test", draw)
         # c = cv2.waitKey(0) & 0xFF
         # if c == 27 or c == ord('q'):
         #     # break
         #     # return
         #     pass
+        # print()
 
         # cv2.imwrite('test.jpg', draw)
-    print(np.mean(iou_list))
+    print(np.mean(results[:][2]))
+    numpy.savetxt(results)
 
 
 if __name__ == "__main__":
-    ds = input("사용할 데이터셋을 선택(c:celebA, w:wider) >> ")
+    ds = input("which dataset?(c:celebA, w:wider) >> ")
     train(ds)
 
