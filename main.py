@@ -143,19 +143,36 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
     # return rectangles
 
 
-def calculate_iou(rectangles, bbox_label):
+def calculate_iou(rectangles, bbox_label, ds='c'):
     ious = []
+    if ds == 'c':
+        for rectangle in rectangles:
+            # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
+            if (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) < 0 or \
+                    (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2]))) < 0:
+                continue
 
-    for rectangle in rectangles:
-        if (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) < 0 or \
-                (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2]))) < 0:
-            continue
+            numerator = (min(rectangle[2], int(bbox_label[1])+int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) * \
+                        (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2])))
+            denominator = (int(bbox_label[3]) * int(bbox_label[4])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
 
-        numerator = (min(rectangle[2], int(bbox_label[1])+int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) * \
-                    (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2])))
-        denominator = (int(bbox_label[3]) * int(bbox_label[4])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
-        iou = numerator / denominator
-        ious.append(iou)
+            iou = numerator / denominator
+            ious.append(iou)
+    else:
+        for lbl in bbox_label:
+            for rectangle in rectangles:
+                # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
+                if (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) < 0 or \
+                        (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1]))) < 0:
+                    continue
+
+                numerator = (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) * \
+                            (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1])))
+                denominator = (int(lbl[2]) * int(lbl[3])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
+
+                iou = numerator / denominator
+                ious.append(iou)
+
 
     return ious
 
@@ -206,11 +223,12 @@ def train(dataset):
 
         root_dir = './WIDER_train/images'
         classes = os.walk(root_dir).__next__()[1]
-
-        img_paths = os.walk(img_dir).__next__()[2]
         imgs = []
-        for path in img_paths:
-            imgs.append(os.path.join(img_dir, path))
+        for c in classes:
+            c_dir = os.path.join(root_dir, c)
+            img_paths = os.walk(c_dir).__next__()[2]
+            for path in img_paths:
+                imgs.append(os.path.join(c_dir, path))
         imgs.sort()
     # ==================================================================================================================
 
@@ -233,7 +251,7 @@ def train(dataset):
         rectangles = detectFace(img, threshold)
         print(rectangles)
 
-        ious = calculate_iou(rectangles, bbox_label)
+        ious = calculate_iou(rectangles, bbox_label, dataset)
         for iou in ious:
             iou_list.append(iou)
             if iou > 0.5:
