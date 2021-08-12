@@ -144,7 +144,12 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet = Rnet(r'24net.h5'))
 
 
 def calculate_iou(rectangles, bbox_label, ds='c'):
+    confidences = []
     ious = []
+    true_positives = []
+    false_positives = []
+    total_objects = 0
+
     if ds == 'c':
         for rectangle in rectangles:
             # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
@@ -166,13 +171,31 @@ def calculate_iou(rectangles, bbox_label, ds='c'):
                         (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1]))) < 0:
                     continue
 
+                # 분자 계산 = 라벨과 예측 bbox의 교집합 넓이
                 numerator = (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) * \
                             (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1])))
+                # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
                 denominator = (int(lbl[2]) * int(lbl[3])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
-
+                # IoU = 교집합넓이 / 합집합넓이
                 iou = numerator / denominator
-                ious.append(iou)
 
+                # IoU 가 0.5 이상이면 올바르게 예측했다고 판단
+                # PR 계산을 위해 Confidence, IoU, TP여부, FP여부 저장 및 해당 bbox 제거(중복 집계 방지)
+                if iou >= 0.5:
+                    confidences.append(rectangle[4])
+                    ious.append(iou)
+                    true_positives.append(1)
+                    false_positives.append(0)
+                    rectangles = rectangles.remove(rectangle)
+                    break
+            # Recall 계산을 위해 전체 bbox 개수 카운트
+            total_objects += 1
+        # FP 케이스는 위 조건문에서 집계되지 않으므로 따로 추가해줌, FP 케이스인지는 모든 라벨을 검토한 후에 확인 가능하기 때문
+        for rectangle in rectangles:
+            confidences.append(rectangle[4])
+            ious.append(0)
+            true_positives.append(0)
+            false_positives.append(1)
 
     return ious
 
