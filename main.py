@@ -214,10 +214,10 @@ def calculate_iou(rects, bbox_label, ds):
     result_list.append(true_positives)
     result_list.append(false_positives)
     result_list = np.transpose(result_list)
-    print("result_list : {}".format(result_list))
+    print("result_list : \nconfidence\tiou\tTP\tFP\n{}".format(result_list))
     # result_list = np.concatenate((np.reshape((-1, 1), confidences), np.reshape((-1, 1), ious), np.reshape((-1, 1), true_positives), np.reshape((-1, 1), false_positives)), axis=1)
 
-    return result_list
+    return result_list, total_objects
 
 
 def train(dataset):
@@ -277,16 +277,20 @@ def train(dataset):
     # while (True):
     # ret, img = cap.read()
     results = []
+    total_objects = 0
+    time_count = []
     count = 1
     for img_path, bbox_label in zip(file_names, bbox_labels):
         print("image count: {}".format(count))
+        t1 = time.time()
         count += 1
         img = cv2.imread(os.path.join(root_dir, img_path))
 
         rectangles = detectFace(img, threshold)
 
-        result = calculate_iou(rectangles, bbox_label, dataset)
+        result, num_of_object = calculate_iou(rectangles, bbox_label, dataset)
         results.append(result)
+        total_objects += num_of_object
         # for iou in ious:
         #     iou_list.append(iou)
         #     if iou > 0.5:
@@ -330,8 +334,19 @@ def train(dataset):
         # print()
 
         # cv2.imwrite('test.jpg', draw)
+        t2 = time.time()
+        time_count.append(t2-t1)
+
+    confidences, ious, tps, fps = results[:][0], results[:][1], results[:][2], results[:][3]
+    print("fps: {}".format(60/np.mean(time_count)))
+    precision, recall = np.sum(tps) / (np.sum(tps) + np.sum(fps)), np.sum(tps) / (np.sum(tps) + total_objects - np.sum(tps))
+    print("Precision: {}\tRecall: {}\tF1_score: {}".format(
+        precision,
+        recall,
+        (2*precision*recall) / (precision+recall)
+    ))
     print(np.mean(results[:][2]))
-    numpy.savetxt(results)
+    numpy.savetxt('result.txt', results)
 
 
 if __name__ == "__main__":
