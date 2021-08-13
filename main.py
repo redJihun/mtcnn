@@ -268,7 +268,8 @@ def train(dataset):
         #     imgs.append(os.path.join(root_dir, path))
     # ==================================================================================================================
 
-    threshold = [0.6, 0.6, 0.7]
+    threshold = [0.3, 0.5, 0.7]
+
     # video_path = 'WalmartArguments
     # _p1.mkv'
     # cap = cv2.VideoCapture(video_path)
@@ -345,7 +346,7 @@ def train(dataset):
     # 즉, TP가 아닌 경우라면 FP임
     confidences, ious, tps, fps = results[:][0], results[:][1], results[:][2], results[:][3]
     # 이미지 하나 처리마다 시간을 측정, 평균 처리시간으로 fps 계산
-    print("fps: {}".format(60/np.mean(time_count)))
+    print("fps: {}".format(np.mean(time_count)))
     # precision = TP / TP + FP
     precision = np.sum(tps) / (np.sum(tps) + np.sum(fps))
     # recall = TP / TP + FN
@@ -355,10 +356,10 @@ def train(dataset):
     print("Precision: {}\tRecall: {}\tF1_score: {}".format(precision, recall, f1_score))
     
     # 결과 array, 파일로 저장
-    with open('result.npy', 'wb') as f:
+    with open('remove_ONet.npy', 'wb') as f:
         np.save(f, results)
 
-    with open('result.txt', 'wb') as f:
+    with open('remove_ONet.txt', 'wb') as f:
         np.savetxt(f, results)
 
 
