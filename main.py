@@ -290,6 +290,11 @@ def train(dataset):
 
         result, num_of_object = calculate_iou(rectangles, bbox_label, dataset)
         results.append(result)
+        # with open('result.npy', 'wb') as f:
+        #     np.save(f, results)
+        # with open('result.npy', 'rb') as f:
+        #     a = np.load(f, allow_pickle=True)
+        # print(a)
         total_objects += num_of_object
         # for iou in ious:
         #     iou_list.append(iou)
@@ -346,7 +351,8 @@ def train(dataset):
         (2*precision*recall) / (precision+recall)
     ))
     print(np.mean(results[:][2]))
-    numpy.savetxt('result.txt', results)
+    with open('result.npy', 'wb') as f:
+        np.save(f, results)
 
 
 if __name__ == "__main__":
