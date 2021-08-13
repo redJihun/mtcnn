@@ -148,29 +148,30 @@ def calculate_iou(rects, bbox_label, ds):
     ious = []
     true_positives = []
     false_positives = []
-    total_objects = len(bbox_label)
+    num_of_object = len(bbox_label)
     rectangles = rects.copy()
-    print("total_objects : {}".format(total_objects))
+    print("num_of_object : {}".format(num_of_object))
     print("input rectangles: {}".format(len(rectangles)))
     if ds == 'c':
         for rectangle in rectangles:
+
             # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
             if (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) < 0 or \
                     (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2]))) < 0:
                 continue
 
+            # 분자 계산 = 라벨과 예측 bbox의 교집합 넓이
             numerator = (min(rectangle[2], int(bbox_label[1])+int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) * \
                         (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2])))
+            # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
             denominator = (int(bbox_label[3]) * int(bbox_label[4])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
-
+            # IoU = 교집합넓이 / 합집합넓이
             iou = numerator / denominator
             ious.append(iou)
     else:
         for lbl in bbox_label:
-            # print("lbl: {}".format(lbl))
             try:
                 for rectangle in rectangles:
-                    # print("single rectangle: {}".format(rectangle))
                     # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
                     if (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) < 0 or \
                             (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1]))) < 0:
@@ -184,7 +185,6 @@ def calculate_iou(rects, bbox_label, ds):
                         denominator = (int(lbl[2]) * int(lbl[3])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
                         # IoU = 교집합넓이 / 합집합넓이
                         iou = numerator / denominator
-                        # print("iou: {}".format(iou))
 
                     # IoU 가 0.5 이상이면 올바르게 예측했다고 판단
                     # PR 계산을 위해 Confidence, IoU, TP여부, FP여부 저장 및 해당 bbox 제거(중복 집계 방지)
@@ -207,7 +207,7 @@ def calculate_iou(rects, bbox_label, ds):
                 false_positives.append(1)
         except:
             pass
-    # confidences = np.reshape((None, 1), confidences)
+
     result_list = []
     result_list.append(confidences)
     result_list.append(ious)
@@ -215,9 +215,8 @@ def calculate_iou(rects, bbox_label, ds):
     result_list.append(false_positives)
     result_list = np.transpose(result_list)
     print("result_list : \nconfidence\tiou\tTP\tFP\n{}".format(result_list))
-    # result_list = np.concatenate((np.reshape((-1, 1), confidences), np.reshape((-1, 1), ious), np.reshape((-1, 1), true_positives), np.reshape((-1, 1), false_positives)), axis=1)
 
-    return result_list, total_objects
+    return result_list, num_of_object
 
 
 def train(dataset):
@@ -289,20 +288,16 @@ def train(dataset):
         rectangles = detectFace(img, threshold)
 
         result, num_of_object = calculate_iou(rectangles, bbox_label, dataset)
-        results.append(result)
+        # results.append(result)
+        results.extend(result)
+        # print(results)
+        # print(np.shape(results))
         # with open('result.npy', 'wb') as f:
         #     np.save(f, results)
         # with open('result.npy', 'rb') as f:
         #     a = np.load(f, allow_pickle=True)
         # print(a)
         total_objects += num_of_object
-        # for iou in ious:
-        #     iou_list.append(iou)
-        #     if iou > 0.5:
-        #         accuracy.append(1)
-        #         tp_list.append(iou)
-        #     else:
-        #         accuracy.append(0)
 
         # draw = img.copy()
         #
@@ -342,17 +337,29 @@ def train(dataset):
         t2 = time.time()
         time_count.append(t2-t1)
 
+    # 성능 확인
+    # confidence = 알고리즘이 해당 bbox에 대해서 가지는 확신 정도
+    # iou = 예측 bbox와 타겟 라벨bbox의 iou(0.5가 넘는 경우 타겟 라벨이라 가정), 타겟 라벨을 찾을 수 없는 경우 0으로 저장됨
+    # tp = True positive 여부(0, 1), 예측 bbox의 iou가 0.5를 넘는 경우 올바르게 예측했다고 판단 -> 1 저장, else: 0 저장
+    # fp = False positive 여부(0, 1), 예측 bbox가 모든 라벨 bbox와 iou가 0.5를 넘지 못 하는 경우 틀린 예측이라 판단 -> 1 저장, else: 0 저장
+    # 즉, TP가 아닌 경우라면 FP임
     confidences, ious, tps, fps = results[:][0], results[:][1], results[:][2], results[:][3]
+    # 이미지 하나 처리마다 시간을 측정, 평균 처리시간으로 fps 계산
     print("fps: {}".format(60/np.mean(time_count)))
-    precision, recall = np.sum(tps) / (np.sum(tps) + np.sum(fps)), np.sum(tps) / (np.sum(tps) + total_objects - np.sum(tps))
-    print("Precision: {}\tRecall: {}\tF1_score: {}".format(
-        precision,
-        recall,
-        (2*precision*recall) / (precision+recall)
-    ))
-    print(np.mean(results[:][2]))
+    # precision = TP / TP + FP
+    precision = np.sum(tps) / (np.sum(tps) + np.sum(fps))
+    # recall = TP / TP + FN
+    recall = np.sum(tps) / total_objects
+    f1_score = (2*precision*recall) / (precision+recall)
+    print("total_objects: {}".format(total_objects))
+    print("Precision: {}\tRecall: {}\tF1_score: {}".format(precision, recall, f1_score))
+    
+    # 결과 array, 파일로 저장
     with open('result.npy', 'wb') as f:
         np.save(f, results)
+
+    with open('result.txt', 'wb') as f:
+        np.savetxt(f, results)
 
 
 if __name__ == "__main__":
