@@ -301,7 +301,7 @@ def train(dataset):
         #     imgs.append(os.path.join(root_dir, path))
     # ==================================================================================================================
 
-    threshold = [0.3, 0.5, 0.7]
+    threshold = [0.6, 0.6, 0.7]
 
     # video_path = 'WalmartArguments
     # _p1.mkv'
@@ -333,41 +333,41 @@ def train(dataset):
         # print(a)
         total_objects += num_of_object
 
-        draw = img.copy()
-
-        for rectangle in rectangles:
-            if rectangle is not None:
-                W = -int(rectangle[0]) + int(rectangle[2])
-                H = -int(rectangle[1]) + int(rectangle[3])
-                paddingH = 0.01 * W
-                paddingW = 0.02 * H
-                crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
-                           int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
-                try:
-                    crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
-                    if crop_img is None:
-                        continue
-                    if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
-                        continue
-                    cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
-                                  (255, 0, 0), 1)
-                except:
-                    continue
-
-                # for i in range(5, 15, 2):
-                #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
-        # print("mean of IoU = {}".format(np.mean(iou_list)))
-        # print("accuracy = {}".format(np.mean(accuracy)))
-        # print("mean of TP IoU = {}".format(np.mean(tp_list)))
-        cv2.imshow("test", draw)
-        c = cv2.waitKey(0) & 0xFF
-        if c == 27 or c == ord('q'):
-            # break
-            # return
-            pass
-
-        print()
-        # cv2.imwrite('test.jpg', draw)
+        # draw = img.copy()
+        #
+        # for rectangle in rectangles:
+        #     if rectangle is not None:
+        #         W = -int(rectangle[0]) + int(rectangle[2])
+        #         H = -int(rectangle[1]) + int(rectangle[3])
+        #         paddingH = 0.01 * W
+        #         paddingW = 0.02 * H
+        #         crop_img = img[int(rectangle[1] + paddingH):int(rectangle[3] - paddingH),
+        #                    int(rectangle[0] - paddingW):int(rectangle[2] + paddingW)]
+        #         try:
+        #             crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2GRAY)
+        #             if crop_img is None:
+        #                 continue
+        #             if crop_img.shape[0] < 0 or crop_img.shape[1] < 0:
+        #                 continue
+        #             cv2.rectangle(draw, (int(rectangle[0]), int(rectangle[1])), (int(rectangle[2]), int(rectangle[3])),
+        #                           (255, 0, 0), 1)
+        #         except:
+        #             continue
+        #
+        #         # for i in range(5, 15, 2):
+        #         #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
+        # # print("mean of IoU = {}".format(np.mean(iou_list)))
+        # # print("accuracy = {}".format(np.mean(accuracy)))
+        # # print("mean of TP IoU = {}".format(np.mean(tp_list)))
+        # cv2.imshow("test", draw)
+        # c = cv2.waitKey(0) & 0xFF
+        # if c == 27 or c == ord('q'):
+        #     # break
+        #     # return
+        #     pass
+        #
+        # print()
+        # # cv2.imwrite('test.jpg', draw)
 
         t2 = time.time()
         time_count.append(t2-t1)

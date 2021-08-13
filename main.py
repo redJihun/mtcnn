@@ -333,10 +333,10 @@ def train(dataset):
         #     # return
         #     pass
         # print()
-
-        # cv2.imwrite('test.jpg', draw)
-        t2 = time.time()
-        time_count.append(t2-t1)
+        #
+        # # cv2.imwrite('test.jpg', draw)
+        # t2 = time.time()
+        # time_count.append(t2-t1)
 
     # 성능 확인
     # confidence = 알고리즘이 해당 bbox에 대해서 가지는 확신 정도
@@ -344,9 +344,10 @@ def train(dataset):
     # tp = True positive 여부(0, 1), 예측 bbox의 iou가 0.5를 넘는 경우 올바르게 예측했다고 판단 -> 1 저장, else: 0 저장
     # fp = False positive 여부(0, 1), 예측 bbox가 모든 라벨 bbox와 iou가 0.5를 넘지 못 하는 경우 틀린 예측이라 판단 -> 1 저장, else: 0 저장
     # 즉, TP가 아닌 경우라면 FP임
-    confidences, ious, tps, fps = results[:][0], results[:][1], results[:][2], results[:][3]
+    results = np.array(results)
+    confidences, ious, tps, fps = results[:, 0], results[:, 1], results[:, 2], results[:, 3]
     # 이미지 하나 처리마다 시간을 측정, 평균 처리시간으로 fps 계산
-    print("fps: {}".format(np.mean(time_count)))
+    print("fps: {}".format(1/np.mean(time_count)))
     # precision = TP / TP + FP
     precision = np.sum(tps) / (np.sum(tps) + np.sum(fps))
     # recall = TP / TP + FN
