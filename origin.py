@@ -379,13 +379,13 @@ def train(dataset):
     # fp = False positive 여부(0, 1), 예측 bbox가 모든 라벨 bbox와 iou가 0.5를 넘지 못 하는 경우 틀린 예측이라 판단 -> 1 저장, else: 0 저장
     # 즉, TP가 아닌 경우라면 FP임
     results = np.array(results)
-    confidences, ious, tps, fps = results[:, 0], results[:, 1], results[:, 2], results[:, 3]
+    confidences, ious, TPs, FPs = results[:, 0], results[:, 1], results[:, 2], results[:, 3]
     # 이미지 하나 처리마다 시간을 측정, 평균 처리시간으로 fps 계산
     print("fps: {}".format(1 / np.mean(time_count)))
     # precision = TP / TP + FP
-    precision = np.sum(tps) / (np.sum(tps) + np.sum(fps))
+    precision = np.sum(TPs) / (np.sum(TPs) + np.sum(FPs))
     # recall = TP / TP + FN
-    recall = np.sum(tps) / total_objects
+    recall = np.sum(TPs) / total_objects
     f1_score = (2 * precision * recall) / (precision + recall)
     print("total_objects: {}".format(total_objects))
     print("Precision: {}\tRecall: {}\tF1_score: {}".format(precision, recall, f1_score))

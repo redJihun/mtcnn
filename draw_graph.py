@@ -19,6 +19,16 @@ print(np.sum(df['TP']))
 print(np.sum(results[0:][3]))
 print(np.sum(df['FP']))
 
+total_count = 0
+tp_count = 0
+fp_count = 0
+graph_list = []
+for item in results:
+    total_count += 1
+    if item[2] == 1.:
+        tp_count += 1
+
+
 # plt.figure(figsize=(40, 5))
 # # sns.lineplot(data=df, x=df['TP']/total_objects, y=df['TP']/(df['TP']+df['FP']))
 # sns.lineplot(data=df, x=df['TP'], y=df['FP'])
