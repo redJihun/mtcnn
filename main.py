@@ -282,11 +282,12 @@ def train(dataset):
     count = 1
     for img_path, bbox_label in zip(file_names, bbox_labels):
         print("image count: {}".format(count))
-        t1 = time.time()
         count += 1
         img = cv2.imread(os.path.join(root_dir, img_path))
 
+        t1 = time.time()
         rectangles = detectFace(img, threshold)
+        t2 = time.time()
 
         result, num_of_object = calculate_iou(rectangles, bbox_label, dataset)
         # results.append(result)
@@ -336,7 +337,6 @@ def train(dataset):
         #
         # # cv2.imwrite('test.jpg', draw)\
 
-        t2 = time.time()
         time_count.append(t2-t1)
 
     # 성능 확인
