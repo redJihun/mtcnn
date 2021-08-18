@@ -30,6 +30,7 @@ graph_df = pd.DataFrame(graph_list, columns=['confidence', 'item_count', 'TP_cou
 plt.figure(figsize=(40, 6))
 # sns.lineplot(data=df, x=df['TP']/total_objects, y=df['TP']/(df['TP']+df['FP']))
 sns.lineplot(data=graph_df, x=graph_df['TP_count']/total_objects, y=graph_df['TP_count']/graph_df['item_count'])
+sns.lineplot(x=graph_df['TP_count']/total_objects, y=np.sum(results[:, 2])/(np.sum(results[:, 2])+total_objects))
 # plt.title('PR Curve(Original)')
 plt.title('PR Curve(Remove ONet)')
 plt.xticks(np.arange(0, 1.1, 0.1))

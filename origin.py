@@ -28,7 +28,7 @@ def Pnet(weight_path='model12old.h5'):
     model = Model([input], [classifier, bbox_regress])
     model.load_weights(weight_path, by_name=True)
 
-    return model
+    return model, bbox_regress
 
 
 def Rnet(weight_path='model24.h5'):
@@ -82,7 +82,10 @@ def Onet(weight_path='model48.h5'):
     return model
 
 
-def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet=Rnet(r'24net.h5'), Onet=Onet(r'48net.h5')):
+def detectFace(img, threshold):
+    pnet, pnet_ = Pnet(r'12net.h5')
+    rnet = Rnet(r'24net.h5')
+    onet = Onet(r'48net.h5')
     caffe_img = (img.copy() - 127.5) / 127.5
     origin_h, origin_w, ch = caffe_img.shape
     scales = tools.calculateScales(img)
@@ -97,7 +100,8 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet=Rnet(r'24net.h5'), O
         ws = int(origin_w * scale)
         scale_img = cv2.resize(caffe_img, (ws, hs))
         input = scale_img.reshape(1, *scale_img.shape)
-        ouput = Pnet.predict(input)  # .transpose(0,2,1,3) should add, but seems after process is wrong then.
+        ouput = pnet.predict(input)  # .transpose(0,2,1,3) should add, but seems after process is wrong then.
+        print('bbox_regress : {}'.format(pnet_))
         out.append(ouput)
 
     image_num = len(scales)
@@ -133,13 +137,14 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet=Rnet(r'24net.h5'), O
 
     predict_24_batch = np.array(predict_24_batch)
 
-    out = Rnet.predict(predict_24_batch)
+    out = rnet.predict(predict_24_batch)
 
     cls_prob = out[0]  # first 0 is to select cls, second batch number, always =0
     cls_prob = np.array(cls_prob)  # convert to numpy
     roi_prob = out[1]  # first 0 is to select roi, second batch number, always =0
     roi_prob = np.array(roi_prob)
     rectangles = tools.filter_face_24net(cls_prob, roi_prob, rectangles, origin_w, origin_h, threshold[1])
+    rectangles = tools.NMS(rectangles, 0.7, 'iou')
     t2 = time.time()
     # print('time for 24 net is: ', t2-t1)
 
@@ -157,7 +162,7 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet=Rnet(r'24net.h5'), O
 
     predict_batch = np.array(predict_batch)
 
-    output = Onet.predict(predict_batch)
+    output = onet.predict(predict_batch)
     cls_prob = output[0]
     roi_prob = output[1]
     pts_prob = output[2]  # index
@@ -165,7 +170,7 @@ def detectFace(img, threshold, Pnet=Pnet(r'12net.h5'), Rnet=Rnet(r'24net.h5'), O
     #                                             threshold[2])
     rectangles = tools.filter_face_48net(cls_prob, roi_prob, pts_prob, rectangles, origin_w, origin_h, threshold[2])
     t3 = time.time()
-    print ('time for 48 net is: ', t3-t2)
+    print('time for 48 net is: ', t3-t2)
 
     return rectangles
 
@@ -267,9 +272,6 @@ def train(dataset):
 
         root_dir = './img_celeba'
         file_names = os.walk(root_dir).__next__()[2]
-        # file_names = []
-        # for path in img_paths:
-        #     file_names.append(os.path.join(root_dir, path))
         file_names.sort()
     # ==================================================================================================================
 
@@ -296,9 +298,6 @@ def train(dataset):
             bbox_labels.append(labels)
 
         root_dir = './WIDER_train/images'
-        # imgs = []
-        # for path in file_names:
-        #     imgs.append(os.path.join(root_dir, path))
     # ==================================================================================================================
 
     threshold = [0.6, 0.6, 0.7]
@@ -322,15 +321,7 @@ def train(dataset):
         rectangles = detectFace(img, threshold)
 
         result, num_of_object = calculate_iou(rectangles, bbox_label, dataset)
-        # results.append(result)
         results.extend(result)
-        # print(results)
-        # print(np.shape(results))
-        # with open('result.npy', 'wb') as f:
-        #     np.save(f, results)
-        # with open('result.npy', 'rb') as f:
-        #     a = np.load(f, allow_pickle=True)
-        # print(a)
         total_objects += num_of_object
 
         # draw = img.copy()
@@ -356,9 +347,6 @@ def train(dataset):
         #
         #         # for i in range(5, 15, 2):
         #         #     cv2.circle(draw, (int(rectangle[i + 0]), int(rectangle[i + 1])), 2, (0, 255, 0))
-        # # print("mean of IoU = {}".format(np.mean(iou_list)))
-        # # print("accuracy = {}".format(np.mean(accuracy)))
-        # # print("mean of TP IoU = {}".format(np.mean(tp_list)))
         # cv2.imshow("test", draw)
         # c = cv2.waitKey(0) & 0xFF
         # if c == 27 or c == ord('q'):
