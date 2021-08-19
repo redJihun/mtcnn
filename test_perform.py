@@ -389,6 +389,9 @@ def detectFace(img, bbox_label, dataset, threshold):
 
     out = []
 
+    # pnet =============================================================================================================
+    t1 = time.time()
+
     for scale in scales:
         hs = int(origin_h * scale)
         ws = int(origin_w * scale)
@@ -400,8 +403,6 @@ def detectFace(img, bbox_label, dataset, threshold):
     image_num = len(scales)
     rectangles = []
 
-    # pnet =============================================================================================================
-    t1 = time.time()
     for i in range(image_num):
         cls_prob = out[i][0][0][:, :, 1] # i = #scale, first 0 select cls score, second 0 = batchnum, alway=0. 1 one hot repr
         roi = out[i][1][0]
@@ -536,6 +537,15 @@ def calculate_iou(rects, bbox_label, ds):
                     false_positives.append(0)
                     rectangles.remove(rectangle)
                     break
+        except:
+            pass
+
+        try:
+            for rectangle in rectangles:
+                confidences.append(rectangle[4])
+                ious.append(0)
+                true_positives.append(0)
+                false_positives.append(1)
         except:
             pass
     else:

@@ -231,6 +231,15 @@ def calculate_iou(rects, bbox_label, ds):
                     break
         except:
             pass
+
+        try:
+            for rectangle in rectangles:
+                confidences.append(rectangle[4])
+                ious.append(0)
+                true_positives.append(0)
+                false_positives.append(1)
+        except:
+            pass
     else:
         num_of_object = len(bbox_label)
         for lbl in bbox_label:

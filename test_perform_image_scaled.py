@@ -385,10 +385,13 @@ def detectFace(img, bbox_label, dataset, threshold):
     # Make zero-mean & (-1,1) scaled
     caffe_img = (img.copy() - 127.5) / 127.5
     origin_h, origin_w, ch = caffe_img.shape
-    scales = calculateScales(img)
+    # scales = calculateScales(img)
+    scales = [1, 2/3, 0.5]
 
     out = []
 
+    # pnet =============================================================================================================
+    t1 = time.time()
     for scale in scales:
         hs = int(origin_h * scale)
         ws = int(origin_w * scale)
@@ -400,8 +403,6 @@ def detectFace(img, bbox_label, dataset, threshold):
     image_num = len(scales)
     rectangles = []
 
-    # pnet =============================================================================================================
-    t1 = time.time()
     for i in range(image_num):
         cls_prob = out[i][0][0][:, :, 1] # i = #scale, first 0 select cls score, second 0 = batchnum, alway=0. 1 one hot repr
         roi = out[i][1][0]
@@ -653,6 +654,7 @@ def train(dataset):
 
         count += 1
         img = cv2.imread(os.path.join(root_dir, img_path))
+
 
         pnet_result, pnms_result, rnet_result, rnms_result, onet_result, time1, time2, time3, time4, time5, num_of_object\
             = detectFace(img, bbox_label, dataset, threshold)
