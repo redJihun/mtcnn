@@ -376,7 +376,7 @@ def filter_face_48net_newdef(cls_prob,roi,pts,rectangles,width,height,threshold)
     return NMS(pick,0.3,'idsom')
 
 
-def detectFace(img, threshold):
+def detectFace(img, bbox_label, dataset, threshold):
     # load pretrained model
     pnet = Pnet(r'12net.h5')
     rnet = Rnet(r'24net.h5')
@@ -400,6 +400,8 @@ def detectFace(img, threshold):
     image_num = len(scales)
     rectangles = []
 
+    # pnet =============================================================================================================
+    t1 = time.time()
     for i in range(image_num):
         cls_prob = out[i][0][0][:, :, 1] # i = #scale, first 0 select cls score, second 0 = batchnum, alway=0. 1 one hot repr
         roi = out[i][1][0]
@@ -411,9 +413,20 @@ def detectFace(img, threshold):
         rectangle = detect_face_12net(cls_prob, roi, out_side, 1/scales[i], origin_w, origin_h, threshold[0])
         rectangles.extend(rectangle)
 
-    # print result(중간 성능)
+    t2 = time.time()
+    time1 = t2 - t1
+    pnet_result, _ = calculate_iou(rectangles, bbox_label, dataset)
+    print("pnet_result: {}".format(pnet_result))
+    # ==================================================================================================================
+
+    # pnms =============================================================================================================
+    t1 = time.time()
     rectangles = NMS(rectangles, 0.7, 'iou')
-    # print result(중간 성능)
+    t2 = time.time()
+    time2 = t2 - t1
+    pnms_result, _ = calculate_iou(rectangles, bbox_label, dataset)
+    print("pnms_result: {}".format(pnms_result))
+    # ==================================================================================================================
 
     if len(rectangles) == 0:
         return rectangles
@@ -429,6 +442,8 @@ def detectFace(img, threshold):
 
     predict_24_batch = np.array(predict_24_batch)
 
+    # rnet =============================================================================================================
+    t1 = time.time()
     out = rnet.predict(predict_24_batch)
 
     cls_prob = out[0]
@@ -436,10 +451,22 @@ def detectFace(img, threshold):
     roi_prob = out[1]
     roi_prob = np.array(roi_prob)
     rectangles = filter_face_24net(cls_prob, roi_prob, rectangles, origin_w, origin_h, threshold[1])
+    t2 = time.time()
 
-    # print result(중간 성능)
+    time3 = t2 - t1
+    rnet_result, _ = calculate_iou(rectangles, bbox_label, dataset)
+    print("rnet_result: {}".format(rnet_result))
+    # ==================================================================================================================
+
+    # rnet =============================================================================================================
+    t1 = time.time()
     rectangles = NMS(rectangles, 0.7, 'iou')
-    # print result(중간 성능)
+    t2 = time.time()
+
+    time4 = t2 - t1
+    rnms_result, _ = calculate_iou(rectangles, bbox_label, dataset)
+    print("rnms_result: {}".format(rnms_result))
+    # ==================================================================================================================
 
     if len(rectangles) == 0:
         return rectangles
@@ -456,14 +483,22 @@ def detectFace(img, threshold):
 
     predict_batch = np.array(predict_batch)
 
+    # onet =============================================================================================================
+    t1 = time.time()
     output = onet.predict(predict_batch)
     cls_prob = output[0]
     roi_prob = output[1]
     pts_prob = output[2]  # index
     rectangles = filter_face_48net_newdef(cls_prob, roi_prob, pts_prob, rectangles, origin_w, origin_h, threshold[2])
     # rectangles = filter_face_48net(cls_prob, roi_prob, pts_prob, rectangles, origin_w, origin_h, threshold[2])
-    # print result(중간 성능)
-    return rectangles
+    t2 = time.time()
+
+    time5 = t2 - t1
+    onet_result, num_of_objects = calculate_iou(rectangles, bbox_label, dataset)
+    print("onet_result: {}".format(onet_result))
+    # ==================================================================================================================
+
+    return pnet_result, pnms_result, rnet_result, rnms_result, onet_result, time1, time2, time3, time4, time5, num_of_objects
 
 
 def calculate_iou(rects, bbox_label, ds):
@@ -471,32 +506,40 @@ def calculate_iou(rects, bbox_label, ds):
     ious = []
     true_positives = []
     false_positives = []
-    num_of_object = len(bbox_label)
     rectangles = rects.copy()
-    print("num_of_object : {}".format(num_of_object))
-    print("input rectangles: {}".format(len(rectangles)))
     if ds == 'c':
-        for rectangle in rectangles:
+        num_of_object = 1
+        try:
+            for rectangle in rectangles:
 
-            # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
-            if (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0],
-                                                                                 int(bbox_label[1]))) < 0 or \
-                    (min(rectangle[3], int(bbox_label[2]) + int(bbox_label[4])) - max(rectangle[1],
-                                                                                      int(bbox_label[2]))) < 0:
-                continue
-
-            # 분자 계산 = 라벨과 예측 bbox의 교집합 넓이
-            numerator = (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0],
-                                                                                          int(bbox_label[1]))) * \
+                # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
+                if (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0],
+                                                                                     int(bbox_label[1]))) < 0 or \
                         (min(rectangle[3], int(bbox_label[2]) + int(bbox_label[4])) - max(rectangle[1],
-                                                                                          int(bbox_label[2])))
-            # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
-            denominator = (int(bbox_label[3]) * int(bbox_label[4])) + (
-                        (rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
-            # IoU = 교집합넓이 / 합집합넓이
-            iou = numerator / denominator
-            ious.append(iou)
+                                                                                          int(bbox_label[2]))) < 0:
+                    continue
+
+                # 분자 계산 = 라벨과 예측 bbox의 교집합 넓이
+                numerator = (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0],
+                                                                                              int(bbox_label[1]))) * \
+                            (min(rectangle[3], int(bbox_label[2]) + int(bbox_label[4])) - max(rectangle[1],
+                                                                                              int(bbox_label[2])))
+                # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
+                denominator = (int(bbox_label[3]) * int(bbox_label[4])) + (
+                            (rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
+                # IoU = 교집합넓이 / 합집합넓이
+                iou = numerator / denominator
+                if iou >= 0.5:
+                    confidences.append(rectangle[4])
+                    ious.append(iou)
+                    true_positives.append(1)
+                    false_positives.append(0)
+                    rectangles.remove(rectangle)
+                    break
+        except:
+            pass
     else:
+        num_of_object = len(bbox_label)
         for lbl in bbox_label:
             try:
                 for rectangle in rectangles:
@@ -537,6 +580,8 @@ def calculate_iou(rects, bbox_label, ds):
         except:
             pass
 
+    print("num_of_object : {}".format(num_of_object))
+    print("input rectangles: {}".format(len(rectangles)))
     result_list = []
     result_list.append(confidences)
     result_list.append(ious)
@@ -599,9 +644,9 @@ def train(dataset):
 
     # while (True):
     # ret, img = cap.read()
-    results = []
+    pnet_results, pnms_results, rnet_results, rnms_results, onet_results = [], [], [], [], []
     total_objects = 0
-    time_count = []
+    time1_count, time2_count, time3_count, time4_count, time5_count = [], [], [], [], []
     count = 1
     for img_path, bbox_label in zip(file_names, bbox_labels):
         print("image count: {}".format(count))
@@ -609,12 +654,21 @@ def train(dataset):
         count += 1
         img = cv2.imread(os.path.join(root_dir, img_path))
 
-        t1 = time.time()
-        rectangles = detectFace(img, threshold)
-        t2 = time.time()
+        pnet_result, pnms_result, rnet_result, rnms_result, onet_result, time1, time2, time3, time4, time5, num_of_object\
+            = detectFace(img, bbox_label, dataset, threshold)
 
-        result, num_of_object = calculate_iou(rectangles, bbox_label, dataset)
-        results.extend(result)
+        pnet_results.extend(pnet_result)
+        pnms_results.extend(pnms_result)
+        rnet_results.extend(rnet_result)
+        rnms_results.extend(rnms_result)
+        onet_results.extend(onet_result)
+
+        time1_count.append(time1)
+        time2_count.append(time2)
+        time3_count.append(time3)
+        time4_count.append(time4)
+        time5_count.append(time5)
+
         total_objects += num_of_object
 
         # draw = img.copy()
@@ -650,32 +704,78 @@ def train(dataset):
         # print()
         # # cv2.imwrite('test.jpg', draw)
 
-        time_count.append(t2-t1)
-
     # 성능 확인
     # confidence = 알고리즘이 해당 bbox에 대해서 가지는 확신 정도
     # iou = 예측 bbox와 타겟 라벨bbox의 iou(0.5가 넘는 경우 타겟 라벨이라 가정), 타겟 라벨을 찾을 수 없는 경우 0으로 저장됨
     # tp = True positive 여부(0, 1), 예측 bbox의 iou가 0.5를 넘는 경우 올바르게 예측했다고 판단 -> 1 저장, else: 0 저장
     # fp = False positive 여부(0, 1), 예측 bbox가 모든 라벨 bbox와 iou가 0.5를 넘지 못 하는 경우 틀린 예측이라 판단 -> 1 저장, else: 0 저장
     # 즉, TP가 아닌 경우라면 FP임
-    results = np.array(results)
-    confidences, ious, TPs, FPs = results[:, 0], results[:, 1], results[:, 2], results[:, 3]
+    pnet_results, pnms_results, rnet_results, rnms_results, onet_results \
+        = np.array(pnet_results), np.array(pnms_results), np.array(rnet_results), np.array(rnms_results), np.array(onet_results)
+
+    pnet_confidences, pnet_ious, pnet_TPs, pnet_FPs = pnet_results[:, 0], pnet_results[:, 1], pnet_results[:, 2], pnet_results[:, 3]
+    pnms_confidences, pnms_ious, pnms_TPs, pnms_FPs = pnms_results[:, 0], pnms_results[:, 1], pnms_results[:, 2], pnms_results[:, 3]
+    rnet_confidences, rnet_ious, rnet_TPs, rnet_FPs = rnet_results[:, 0], rnet_results[:, 1], rnet_results[:, 2], rnet_results[:, 3]
+    rnms_confidences, rnms_ious, rnms_TPs, rnms_FPs = rnms_results[:, 0], rnms_results[:, 1], rnms_results[:, 2], rnms_results[:, 3]
+    onet_confidences, onet_ious, onet_TPs, onet_FPs = onet_results[:, 0], onet_results[:, 1], onet_results[:, 2], onet_results[:, 3]
+
     # 이미지 하나 처리마다 시간을 측정, 평균 처리시간으로 fps 계산
-    print("fps: {}".format(1 / np.mean(time_count)))
+    print("pnet fps: {}".format(1 / np.mean(time1_count)))
+    print("pnms fps: {}".format(1 / np.mean(time2_count)))
+    print("rnet fps: {}".format(1 / np.mean(time3_count)))
+    print("rnms fps: {}".format(1 / np.mean(time4_count)))
+    print("onet fps: {}".format(1 / np.mean(time5_count)))
+
     # precision = TP / TP + FP
-    precision = np.sum(TPs) / (np.sum(TPs) + np.sum(FPs))
+    pnet_precision = np.sum(pnet_TPs) / (np.sum(pnet_TPs) + np.sum(pnet_FPs))
+    pnms_precision = np.sum(pnms_TPs) / (np.sum(pnms_TPs) + np.sum(pnms_FPs))
+    rnet_precision = np.sum(rnet_TPs) / (np.sum(rnet_TPs) + np.sum(rnet_FPs))
+    rnms_precision = np.sum(rnms_TPs) / (np.sum(rnms_TPs) + np.sum(rnms_FPs))
+    onet_precision = np.sum(onet_TPs) / (np.sum(onet_TPs) + np.sum(onet_FPs))
+
     # recall = TP / TP + FN
-    recall = np.sum(TPs) / total_objects
-    f1_score = (2 * precision * recall) / (precision + recall)
+    pnet_recall = np.sum(pnet_TPs) / total_objects
+    pnms_recall = np.sum(pnms_TPs) / total_objects
+    rnet_recall = np.sum(rnet_TPs) / total_objects
+    rnms_recall = np.sum(rnms_TPs) / total_objects
+    onet_recall = np.sum(onet_TPs) / total_objects
+
+    pnet_f1_score = (2 * pnet_precision * pnet_recall) / (pnet_precision + pnet_recall)
+    pnms_f1_score = (2 * pnms_precision * pnms_recall) / (pnms_precision + pnms_recall)
+    rnet_f1_score = (2 * rnet_precision * rnet_recall) / (rnet_precision + rnet_recall)
+    rnms_f1_score = (2 * rnms_precision * rnms_recall) / (rnms_precision + rnms_recall)
+    onet_f1_score = (2 * onet_precision * onet_recall) / (onet_precision + onet_recall)
+
     print("total_objects: {}".format(total_objects))
-    print("Precision: {}\tRecall: {}\tF1_score: {}".format(precision, recall, f1_score))
+
+    print("pnet_Precision: {}\tRecall: {}\tF1_score: {}".format(pnet_precision, pnet_recall, pnet_f1_score))
+    print("pnms_Precision: {}\tRecall: {}\tF1_score: {}".format(pnms_precision, pnms_recall, pnms_f1_score))
+    print("rnet_Precision: {}\tRecall: {}\tF1_score: {}".format(rnet_precision, rnet_recall, rnet_f1_score))
+    print("rnms_Precision: {}\tRecall: {}\tF1_score: {}".format(rnms_precision, rnms_recall, rnms_f1_score))
+    print("onet_Precision: {}\tRecall: {}\tF1_score: {}".format(onet_precision, onet_recall, onet_f1_score))
 
     # 결과 array, 파일로 저장
-    with open('origin.npy', 'wb') as f:
-        np.save(f, results)
+    with open('pnet_.npy', 'wb') as f:
+        np.save(f, pnet_results)
+    with open('pnms_.npy', 'wb') as f:
+        np.save(f, pnms_results)
+    with open('rnet_.npy', 'wb') as f:
+        np.save(f, rnet_results)
+    with open('rnms_.npy', 'wb') as f:
+        np.save(f, rnms_results)
+    with open('onet_.npy', 'wb') as f:
+        np.save(f, onet_results)
 
-    with open('origin.txt', 'wb') as f:
-        np.savetxt(f, results)
+    with open('pnet_.txt', 'wb') as f:
+        np.savetxt(f, pnet_results)
+    with open('pnms_.txt', 'wb') as f:
+        np.savetxt(f, pnms_results)
+    with open('rnet_.txt', 'wb') as f:
+        np.savetxt(f, rnet_results)
+    with open('rnms_.txt', 'wb') as f:
+        np.savetxt(f, rnms_results)
+    with open('onet_.txt', 'wb') as f:
+        np.savetxt(f, onet_results)
 
 
 if __name__ == "__main__":

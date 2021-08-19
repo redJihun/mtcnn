@@ -148,27 +148,40 @@ def calculate_iou(rects, bbox_label, ds):
     ious = []
     true_positives = []
     false_positives = []
-    num_of_object = len(bbox_label)
     rectangles = rects.copy()
-    print("num_of_object : {}".format(num_of_object))
-    print("input rectangles: {}".format(len(rectangles)))
     if ds == 'c':
-        for rectangle in rectangles:
+        num_of_object = 1
+        try:
+            for rectangle in rectangles:
 
-            # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
-            if (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) < 0 or \
-                    (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2]))) < 0:
-                continue
+                # bbox가 라벨box의 범위를 아예 벗어나는 경우 iou를 계산하지 않음
+                if (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0],
+                                                                                     int(bbox_label[1]))) < 0 or \
+                        (min(rectangle[3], int(bbox_label[2]) + int(bbox_label[4])) - max(rectangle[1],
+                                                                                          int(bbox_label[2]))) < 0:
+                    continue
 
-            # 분자 계산 = 라벨과 예측 bbox의 교집합 넓이
-            numerator = (min(rectangle[2], int(bbox_label[1])+int(bbox_label[3])) - max(rectangle[0], int(bbox_label[1]))) * \
-                        (min(rectangle[3], int(bbox_label[2])+int(bbox_label[4])) - max(rectangle[1], int(bbox_label[2])))
-            # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
-            denominator = (int(bbox_label[3]) * int(bbox_label[4])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
-            # IoU = 교집합넓이 / 합집합넓이
-            iou = numerator / denominator
-            ious.append(iou)
+                # 분자 계산 = 라벨과 예측 bbox의 교집합 넓이
+                numerator = (min(rectangle[2], int(bbox_label[1]) + int(bbox_label[3])) - max(rectangle[0],
+                                                                                              int(bbox_label[1]))) * \
+                            (min(rectangle[3], int(bbox_label[2]) + int(bbox_label[4])) - max(rectangle[1],
+                                                                                              int(bbox_label[2])))
+                # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
+                denominator = (int(bbox_label[3]) * int(bbox_label[4])) + (
+                            (rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
+                # IoU = 교집합넓이 / 합집합넓이
+                iou = numerator / denominator
+                if iou >= 0.5:
+                    confidences.append(rectangle[4])
+                    ious.append(iou)
+                    true_positives.append(1)
+                    false_positives.append(0)
+                    rectangles.remove(rectangle)
+                    break
+        except:
+            pass
     else:
+        num_of_object = len(bbox_label)
         for lbl in bbox_label:
             try:
                 for rectangle in rectangles:
@@ -182,7 +195,8 @@ def calculate_iou(rects, bbox_label, ds):
                         numerator = (min(rectangle[2], int(lbl[0]) + int(lbl[2])) - max(rectangle[0], int(lbl[0]))) * \
                                     (min(rectangle[3], int(lbl[1]) + int(lbl[3])) - max(rectangle[1], int(lbl[1])))
                         # 분모 계산 = 라벨과 예측 bbox의 합집합 넓이(= 라벨bbox넓이 + 예측bbox넓이 - 교집합넓이)
-                        denominator = (int(lbl[2]) * int(lbl[3])) + ((rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
+                        denominator = (int(lbl[2]) * int(lbl[3])) + (
+                                    (rectangle[2] - rectangle[0]) * (rectangle[3] - rectangle[1])) - numerator
                         # IoU = 교집합넓이 / 합집합넓이
                         iou = numerator / denominator
 
@@ -208,6 +222,8 @@ def calculate_iou(rects, bbox_label, ds):
         except:
             pass
 
+    print("num_of_object : {}".format(num_of_object))
+    print("input rectangles: {}".format(len(rectangles)))
     result_list = []
     result_list.append(confidences)
     result_list.append(ious)

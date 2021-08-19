@@ -200,8 +200,6 @@ def calculate_iou(rects, bbox_label, ds):
     true_positives = []
     false_positives = []
     rectangles = rects.copy()
-    print("num_of_object : {}".format(num_of_object))
-    print("input rectangles: {}".format(len(rectangles)))
     if ds == 'c':
         num_of_object = 1
         try:
@@ -231,15 +229,6 @@ def calculate_iou(rects, bbox_label, ds):
                     false_positives.append(0)
                     rectangles.remove(rectangle)
                     break
-        except:
-            pass
-
-        try:
-            for rectangle in rectangles:
-                confidences.append(rectangle[4])
-                ious.append(0)
-                true_positives.append(0)
-                false_positives.append(1)
         except:
             pass
     else:
@@ -284,6 +273,8 @@ def calculate_iou(rects, bbox_label, ds):
         except:
             pass
 
+    print("num_of_object : {}".format(num_of_object))
+    print("input rectangles: {}".format(len(rectangles)))
     result_list = []
     result_list.append(confidences)
     result_list.append(ious)
