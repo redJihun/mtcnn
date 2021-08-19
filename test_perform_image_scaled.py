@@ -755,26 +755,26 @@ def train(dataset):
     print("onet_Precision: {}\tRecall: {}\tF1_score: {}".format(onet_precision, onet_recall, onet_f1_score))
 
     # 결과 array, 파일로 저장
-    with open('pnet_.npy', 'wb') as f:
+    with open('CI_pnet_.npy', 'wb') as f:
         np.save(f, pnet_results)
-    with open('pnms_.npy', 'wb') as f:
+    with open('CI_pnms_.npy', 'wb') as f:
         np.save(f, pnms_results)
-    with open('rnet_.npy', 'wb') as f:
+    with open('CI_rnet_.npy', 'wb') as f:
         np.save(f, rnet_results)
-    with open('rnms_.npy', 'wb') as f:
+    with open('CI_rnms_.npy', 'wb') as f:
         np.save(f, rnms_results)
-    with open('onet_.npy', 'wb') as f:
+    with open('CI_onet_.npy', 'wb') as f:
         np.save(f, onet_results)
 
-    with open('pnet_.txt', 'wb') as f:
+    with open('CI_pnet_.txt', 'wb') as f:
         np.savetxt(f, pnet_results)
-    with open('pnms_.txt', 'wb') as f:
+    with open('CI_pnms_.txt', 'wb') as f:
         np.savetxt(f, pnms_results)
-    with open('rnet_.txt', 'wb') as f:
+    with open('CI_rnet_.txt', 'wb') as f:
         np.savetxt(f, rnet_results)
-    with open('rnms_.txt', 'wb') as f:
+    with open('CI_rnms_.txt', 'wb') as f:
         np.savetxt(f, rnms_results)
-    with open('onet_.txt', 'wb') as f:
+    with open('CI_onet_.txt', 'wb') as f:
         np.savetxt(f, onet_results)
 
 
